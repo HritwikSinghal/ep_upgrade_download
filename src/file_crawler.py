@@ -101,7 +101,7 @@ class File_Crawler:
             if len(x) != 0:
                 for file_name in range(len(x[0])):
                     if os.path.isfile(os.path.join(folder_name, x[0][file_name])):
-                        file_list.append((folder_name, x[0][file_name], False))
+                        file_list.append((folder_name, x[0][file_name]))
 
         # return sorted
         return sorted(file_list, key=lambda temp: temp[1])
@@ -109,7 +109,7 @@ class File_Crawler:
     def get_files(self):
         """
         :return file_list : list : List of files in that folder,
-                stores a tuple = (absolute path of file's folder : str, name of file : str, downloaded: bool)
+                stores a tuple = (absolute path of file's folder : str, name of file : str)
         """
 
         file_list = []
