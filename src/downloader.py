@@ -92,9 +92,7 @@ class downloader:
         :return:
         """
         my_ytdl = ytdl_downloader.YTDL_Downloader()
-        os.chdir(self._save_dir)
-        print("chdir to ", self._save_dir)
-
+        my_ytdl.set_save_dir(self._save_dir)
         my_ytdl.set_download_url(url)
         my_ytdl.start()
 
@@ -167,18 +165,12 @@ class downloader:
             results: dict = searx.SearX().get_results_json(search_query=search_query)['results']
             url = self.__get_best_result(results, file_name=file[1])
 
-            while not file[2]:
-                try:
-                    # Setup Youtube Downloader and start downloading
-                    self.__download(url)
+            # Setup Youtube Downloader and start downloading
+            self.__download(url)
 
-                    # Update tuple[2] to True, means file has successfully been downloaded
-                    file = self.__update_tuple(file, 2)
+            # Update tuple[2] to True, means file has successfully been downloaded
+            files_list[i] = self.__update_tuple(file, 2)
 
-                    # Download has finished, now rename file and move it to common location
-                    # Not needed  after adding episode_number in YTDL 'outtmpl'
-                    # self.__rename_move(file, global_save_dir)
-
-                except:
-                    time.sleep(15)
-                    traceback.print_exc()
+            # Download has finished, now rename file and move it to common location
+            # Not needed  after adding episode_number in YTDL 'outtmpl'
+            # self.__rename_move(file, global_save_dir)

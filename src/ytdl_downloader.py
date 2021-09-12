@@ -1,4 +1,6 @@
 import os
+import time
+import traceback
 
 import youtube_dl
 
@@ -6,8 +8,9 @@ import youtube_dl
 class YTDL_Downloader:
 
     def __init__(self, prefix='', download_url='https://www.youtube.com/watch?v=VdyBtGaspss'):
-        self._download_url: str = 'https://www.youtube.com/watch?v=4yVnnH4amd8'
+        self._download_url: str = download_url
         self._prefix = prefix
+        self._save_dir = os.path.expanduser("~/Downloads/Video")
         self._ydl_opts: dict = {
             'progress_hooks': [self.__my_hook],
             'quiet': True,
@@ -34,6 +37,21 @@ class YTDL_Downloader:
     def get_download_url(self):
         return self._download_url
 
+    def set_save_dir(self, save_dir):
+        self._save_dir = save_dir
+
+    def get_save_dir(self):
+        return self._save_dir
+
     def start(self):
-        with youtube_dl.YoutubeDL(self._ydl_opts) as ydl:
-            ydl.download([self._download_url])
+        os.chdir(self._save_dir)
+        print("Saving to ", self._save_dir)
+
+        while True:
+            try:
+                with youtube_dl.YoutubeDL(self._ydl_opts) as ydl:
+                    ydl.download([self._download_url])
+                    break
+            except:
+                time.sleep(15)
+                traceback.print_exc()
