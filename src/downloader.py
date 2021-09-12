@@ -8,7 +8,7 @@ import requests
 from src import ytdl_downloader, searx
 
 
-def get_name_no_ext(filename):
+def get_name_no_ext(filename: str):
     filename = re.sub(
         r'\.[mM][pP]4|'
         r'\.[mM][kK][vV]|'
@@ -43,7 +43,7 @@ class downloader:
 
         return 'Taarak Mehta Ka Ooltah Chashmah ' + ep_name + ' sonyliv'
 
-    def __check_url(self, url: str):
+    def __check_url(self, url: str, file_name: str):
         """
         checks if the url is correct for that episode
         :param url:
@@ -53,17 +53,24 @@ class downloader:
             return False
 
         # parse url and check episode number
-        # url = 'https://www.sonyliv.com/shows/taarak-mehta-ka-ooltah-chashmah-1700000084/daya-ka-surprise-1000021355?watch=true'
+        # url = 'https://www.sonyliv.com/shows/taarak-mehta-ka-ooltah-chashmah-1700000084/daya-ka-surprise-1000021355'
         response = requests.get(url, headers=self._headers, allow_redirects=True)
+
+        # Find ep no from url
         x = re.findall(r'\"episodeNumber\":\"(\d+)\"', response.text)
         try:
+            # check if this matches the ep no we want to download
             ep_no = x[0]
+            ep_name_we_want = re.findall('\d{3,4}', get_name_no_ext(file_name))[0]
+
+            if ep_no != ep_name_we_want:
+                return False
         except:
             return False
 
         return True
 
-    def __get_best_result(self, results: dict):
+    def __get_best_result(self, results: dict, file_name: str):
         """
         from all the results, get the best match
         :param results: dict: dict (from Searx) which contains data in json format
@@ -72,7 +79,7 @@ class downloader:
         for result in results:
             if result['engines'][0] == 'google' and result['parsed_url'][1] == 'www.sonyliv.com':
                 url = result['url']
-                if self.__check_url(url):
+                if self.__check_url(url, file_name):
                     # print(url)
                     return url
 
@@ -158,7 +165,7 @@ class downloader:
             search_query: str = self.__create_search_query(file[1])
             # print(search_query)
             results: dict = searx.SearX().get_results_json(search_query=search_query)['results']
-            url = self.__get_best_result(results)
+            url = self.__get_best_result(results, file_name=file[1])
 
             while not file[2]:
                 try:
