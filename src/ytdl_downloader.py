@@ -12,7 +12,7 @@ class YTDL_Downloader:
             'progress_hooks': [self.__my_hook],
             'quiet': True,
             'no_warnings': True,
-            'outtmpl': '%(title)s.%(ext)s'
+            'outtmpl': '%(episode_number)s - %(title)s.%(ext)s'
         }
 
     def __my_hook(self, d):
