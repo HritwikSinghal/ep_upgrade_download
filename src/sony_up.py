@@ -104,3 +104,6 @@ class Upgrade_SL:
         """
 
         self.__parallel()
+
+        # For test
+        # downloader().start(0, self._files, self._save_dir)

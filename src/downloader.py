@@ -3,6 +3,8 @@ import re
 import time
 import traceback
 
+import requests
+
 from src import ytdl_downloader, searx
 
 
@@ -24,6 +26,13 @@ class downloader:
         self._save_dir: str = ''
         self._start_vid_no: int = -1
 
+        self._headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; rv:91.0) Gecko/20100101 Firefox/91.0',
+            'Referer': 'www.sonyliv.com/',
+            'Origin': 'www.sonyliv.com',
+            'Host': 'www.sonyliv.com'
+        }
+
     def __create_search_query(self, filename: str):
         """
         Create search Query from filename
@@ -43,8 +52,14 @@ class downloader:
         if url == '':
             return False
 
-        # todo : parse url and check episode number
-
+        # parse url and check episode number
+        # url = 'https://www.sonyliv.com/shows/taarak-mehta-ka-ooltah-chashmah-1700000084/daya-ka-surprise-1000021355?watch=true'
+        response = requests.get(url, headers=self._headers, allow_redirects=True)
+        x = re.findall(r'\"episodeNumber\":\"(\d+)\"', response.text)
+        try:
+            ep_no = x[0]
+        except:
+            return False
 
         return True
 

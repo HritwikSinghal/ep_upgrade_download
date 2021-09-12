@@ -1,5 +1,5 @@
-from src import sony_up
+from src.sony_up import Upgrade_SL
 
 if __name__ == '__main__':
-    upgrade = sony_up.Upgrade_SL()
+    upgrade = Upgrade_SL()
     upgrade.start()
