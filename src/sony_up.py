@@ -21,13 +21,9 @@ def get_name_no_ext(filename):
 
 class Upgrade_SL:
 
-    def __init__(self, save_dir: str = ''):
-        self.files_dir = '/Videos'
-        self.exclude_dirs = {
-            'ABC': '1',
-            'XYZ': '0',
-            'AAA': '1'
-        }
+    def __init__(self, files_dir: str, exclude_dirs: dict = None, save_dir: str = ''):
+        self.files_dir: str = files_dir
+        self.exclude_dirs: dict = exclude_dirs
         self._save_dir: str = save_dir
         self._files: list = []
 
@@ -67,12 +63,22 @@ class Upgrade_SL:
     def __pp_dict(self, json_dict: dict):
         print(json.dumps(json_dict, indent=4))
 
-    def __parallel(self):
+    def __parallel(self, search_prefix: str = '', search_suffix: str = ''):
+        # Todo : make process pool and remove hardcoded values
         # creating processes
-        p1 = multiprocessing.Process(target=downloader().start, args=(0, self._files, self._save_dir,))
-        p2 = multiprocessing.Process(target=downloader().start, args=(4, self._files, self._save_dir,))
-        p3 = multiprocessing.Process(target=downloader().start, args=(8, self._files, self._save_dir,))
-        p4 = multiprocessing.Process(target=downloader().start, args=(12, self._files, self._save_dir,))
+        n = 4  # from 0 to 4, 5 to 8, 9 to 12, 13 to 16 . All intervals are of size n
+        p1 = multiprocessing.Process(
+            target=downloader().start, args=(0, n, self._files, self._save_dir, search_prefix, search_suffix,)
+        )
+        p2 = multiprocessing.Process(
+            target=downloader().start, args=(n, n, self._files, self._save_dir, search_prefix, search_suffix,)
+        )
+        p3 = multiprocessing.Process(
+            target=downloader().start, args=(2 * n, n, self._files, self._save_dir, search_prefix, search_suffix,)
+        )
+        p4 = multiprocessing.Process(
+            target=downloader().start, args=(3 * n, n, self._files, self._save_dir, search_prefix, search_suffix,)
+        )
 
         # starting process
         p1.start()
@@ -89,10 +95,13 @@ class Upgrade_SL:
         # processes finished
         print("Done!")
 
-    def start(self):
+    def start(self, search_prefix: str = '', search_suffix: str = ''):
         # Get files list
-        my_crawler = file_crawler.File_Crawler(file_dir=self.files_dir, exclude_dirs=self.exclude_dirs,
-                                               recursive_crawl_flag=True)
+        my_crawler = file_crawler.File_Crawler(
+            file_dir=self.files_dir,
+            exclude_dirs=self.exclude_dirs,
+            recursive_crawl_flag=True
+        )
         self._files: list = my_crawler.get_files()
 
         # Add boolean flag to files which will be true when file is downloaded.
@@ -103,7 +112,8 @@ class Upgrade_SL:
         stores a tuple = (absolute path of file's folder : str, name of file : str, downloaded: bool)
         """
 
-        self.__parallel()
+        ## ---- for Debug ---- ##
+        # downloader().start(0, 4, self._files, self._save_dir)
+        ## ------------------- ##
 
-        # For test
-        # downloader().start(0, self._files, self._save_dir)
+        self.__parallel(search_prefix=search_prefix, search_suffix=search_suffix)

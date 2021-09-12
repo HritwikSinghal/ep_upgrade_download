@@ -1,7 +1,6 @@
+import json
 import os
 import re
-import time
-import traceback
 
 import requests
 
@@ -33,15 +32,17 @@ class downloader:
             'Host': 'www.sonyliv.com'
         }
 
-    def __create_search_query(self, filename: str):
+    def __create_search_query(self, filename: str, prefix: str = '', suffix: str = ''):
         """
         Create search Query from filename
-        :param filename: str
-        :return: str
+        :param filename: str : file name from which we extract ep no
+        :param prefix: prefix for query
+        :param suffix: suffix to attach at end of query
+        :return: str: query
         """
         ep_name = get_name_no_ext(filename)
 
-        return 'Taarak Mehta Ka Ooltah Chashmah ' + ep_name + ' sonyliv'
+        return prefix + ' ' + ep_name + ' ' + suffix
 
     def __check_url(self, url: str, file_name: str):
         """
@@ -61,7 +62,8 @@ class downloader:
         try:
             # check if this matches the ep no we want to download
             ep_no = x[0]
-            ep_name_we_want = re.findall('\d{3,4}', get_name_no_ext(file_name))[0]
+            ep_name_we_want = re.findall('\d+', get_name_no_ext(file_name))[0]
+            # ep_name_we_want = re.findall('\d{3,4}', get_name_no_ext(file_name))[0]
 
             if ep_no != ep_name_we_want:
                 return False
@@ -76,12 +78,18 @@ class downloader:
         :param results: dict: dict (from Searx) which contains data in json format
         :return: str: url of the best match result
         """
-        for result in results:
+        for result in results['results']:
             if result['engines'][0] == 'google' and result['parsed_url'][1] == 'www.sonyliv.com':
                 url = result['url']
                 if self.__check_url(url, file_name):
                     # print(url)
                     return url
+
+        ## ---- for Debug ---- ##
+        os.chdir(self._save_dir)
+        with open(file_name + '_error_debug.txt', 'w+') as ttt:
+            json.dump(results, ttt, indent=2)
+        ## ------------------- ##
 
         return ''
 
@@ -93,8 +101,9 @@ class downloader:
         """
         my_ytdl = ytdl_downloader.YTDL_Downloader()
         my_ytdl.set_save_dir(self._save_dir)
-        my_ytdl.set_download_url(url)
-        my_ytdl.start()
+        my_ytdl.set_download_url(download_url=url)
+        status_code: int = my_ytdl.start()
+        return status_code
 
     def __update_tuple(self, tuple_name: tuple, pos: int):
         """
@@ -107,6 +116,8 @@ class downloader:
         y[pos] = True
         tuple_name = tuple(y)
         return tuple_name
+
+    ## ---------------------------------------------------------------------- ##
 
     def __create_folders(self, filename: str, old_save_dir):
         """
@@ -144,33 +155,39 @@ class downloader:
 
         os.rename(old_name_full, new_name)
 
-    def start(self, start_vid_no: int, files_list: list[tuple], global_save_dir: str):
+    ## ---------------------------------------------------------------------- ##
+
+    def start(
+            self,
+            start_vid_no: int,
+            skip_n: int,
+            files_list: list[tuple],
+            global_save_dir: str,
+            search_prefix: str = '',
+            search_suffix: str = ''
+    ):
+
         self._save_dir = global_save_dir
         self._start_vid_no = start_vid_no
 
-        for i in range(start_vid_no, start_vid_no + 4):
-            print()
+        # Todo : make it skip n files instead of doing first n.
+        # Todo: handle case where files are not multiple of n
+        for i in range(start_vid_no, start_vid_no + skip_n):
             file = files_list[i]
 
             # If file has been downloaded, skip this
             if file[2]:
                 continue
 
-            # create save directory for each file, Not needed after adding episode_number in YTDL 'outtmpl'
-            # self.__create_folders(file[1], global_save_dir)
-
             # Get results for each file
-            search_query: str = self.__create_search_query(file[1])
+            search_query: str = self.__create_search_query(file[1], prefix=search_prefix, suffix=search_suffix)
             # print(search_query)
-            results: dict = searx.SearX().get_results_json(search_query=search_query)['results']
+            results: dict = searx.SearX().get_results_json(search_query=search_query)
             url = self.__get_best_result(results, file_name=file[1])
 
             # Setup Youtube Downloader and start downloading
-            self.__download(url)
+            status_code: int = self.__download(url)
 
             # Update tuple[2] to True, means file has successfully been downloaded
-            files_list[i] = self.__update_tuple(file, 2)
-
-            # Download has finished, now rename file and move it to common location
-            # Not needed  after adding episode_number in YTDL 'outtmpl'
-            # self.__rename_move(file, global_save_dir)
+            if status_code == 1:
+                files_list[i] = self.__update_tuple(file, 2)

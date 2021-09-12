@@ -6,8 +6,15 @@ import youtube_dl
 
 
 class YTDL_Downloader:
+    """
+    Inputs url as str, Downloads the video/audio to download dir
+    Returns a code:
+            1 = Successfull
+            0 = wrong parameter
+            -1/None = error
+    """
 
-    def __init__(self, prefix='', download_url='https://www.youtube.com/watch?v=VdyBtGaspss'):
+    def __init__(self, download_url='https://www.youtube.com/watch?v=VdyBtGaspss', prefix=''):
         self._download_url: str = download_url
         self._prefix = prefix
         self._save_dir = os.path.expanduser("~/Downloads/Video")
@@ -47,11 +54,15 @@ class YTDL_Downloader:
         os.chdir(self._save_dir)
         print("Saving to ", self._save_dir)
 
+        if self._download_url == '':
+            return 0  # means something is wrong with your params
+
         while True:
             try:
                 with youtube_dl.YoutubeDL(self._ydl_opts) as ydl:
                     ydl.download([self._download_url])
-                    break
             except:
                 time.sleep(15)
                 traceback.print_exc()
+            else:
+                return 1
