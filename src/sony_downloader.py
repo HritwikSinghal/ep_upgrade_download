@@ -1,9 +1,11 @@
 import json
 import os
 import re
+from concurrent.futures import ProcessPoolExecutor
 
 import requests
 
+from src import file_crawler
 from src import ytdl_downloader, searx
 
 
@@ -19,64 +21,42 @@ def get_name_no_ext(filename: str):
     return str(filename).strip()
 
 
-# ## ---------------------------------------------------------------------- ##
-#
-# def __create_folders(self, filename: str, old_save_dir):
-#     """
-#     Will create a folder for each filename at old_save_dir
-#     :param filename: str:  Name of file (ep number)
-#     :param old_save_dir: where folder is to be created
-#     :return:
-#     """
-#     filename = get_name_no_ext(filename)
-#     download_dir = os.path.expanduser(old_save_dir + '/' + filename)
-#
-#     if not os.path.isdir(download_dir):
-#         os.mkdir(download_dir)
-#     self._save_dir = download_dir
-#
-# def __rename_move(self, file: tuple, global_save_dir: str):
-#     """
-#     check if file has been downloaded, then rename and move it accordingly
-#     :param file: tuple:
-#     :param global_save_dir: str
-#     :return:
-#     """
-#
-#     # old_todo: check if file has been downloaded
-#     os.chdir(self._save_dir)
-#
-#     old_name: str = os.listdir(self._save_dir)[0]
-#     old_name_full: str = os.path.join(self._save_dir, os.listdir(self._save_dir)[0])
-#     new_name = os.path.join(global_save_dir, get_name_no_ext(file[1]) + ' - ' + old_name)
-#
-#     # print('self._save_dir=', self._save_dir)
-#     # print('oldname= ', old_name)
-#     # print('old_name_full=', old_name_full)
-#     # print('newname= ', new_name)
-#
-#     os.rename(old_name_full, new_name)
-#
-# ## ---------------------------------------------------------------------- ##
+class _Parallel_Downloader:
+    def __init__(self, save_dir):
+        self._save_dir = save_dir
+
+    def download(self, url: str):
+        """
+        Start Download using YTDL class and save it save_dir
+        :param url: url to be downloaded
+        :return:
+        """
+        my_ytdl = ytdl_downloader.YTDL_Downloader()
+        my_ytdl.set_save_dir(self._save_dir)
+        my_ytdl.set_download_url(download_url=url)
+        status_code: int = my_ytdl.start()
+        return status_code
 
 
-class downloader:
+class Downloader:
     """
     Search query on searX and download from website automatically using yt-dl
     takes files_list (list) which contains file name (str) and creates search query using prefix and suffix as supplied
     Can download multiple files.
     """
 
-    def __init__(self, save_dir: str = '', preferred_engine: str = '', preferred_website: str = ''):
+    def __init__(self, files_dir: str, exclude_dirs: dict = None, save_dir: str = ''):
         """
+        :param files_dir: str : dir where files are stored
+        :param exclude_dirs: dict : earch entry will contain dir to be excluded as key and a bool as value
+                                    if skip dir and its sub-dir, then -> True,
+                                    else if only skip that dir -> false
         :param save_dir: str: optional, folder where media is to be saved (absolute path)
-        :param preferred_engine: str: preferred search engine to filter search results
-        :param preferred_website: str : preferred website to search results
         """
 
+        self._files_dir: str = files_dir
+        self._exclude_dirs: dict = exclude_dirs
         self._save_dir: str = save_dir
-        self._preferred_engine: str = preferred_engine
-        self._preferred_website: str = preferred_website
 
         self._headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; rv:91.0) Gecko/20100101 Firefox/91.0',
@@ -84,6 +64,9 @@ class downloader:
             'Origin': 'www.sonyliv.com',
             'Host': 'www.sonyliv.com'
         }
+
+        self._search_prefix = ''
+        self._search_suffix = 'site:www.sonyliv.com'
 
         self.__init_func()
 
@@ -109,7 +92,9 @@ class downloader:
         if not os.path.isdir(self.get_save_dir()):
             os.mkdir(self.get_save_dir())
 
-        print("YT-DL Save Dir: ", self.get_save_dir())
+        print("Save Dir: ", self.get_save_dir())
+
+    # ------------------------- #
 
     def __create_search_query(self, filename: str, prefix: str = '', suffix: str = ''):
         """
@@ -123,7 +108,6 @@ class downloader:
 
         return str(prefix + ' ' + ep_name + ' ' + suffix).strip()
 
-    # Todo: remove hard code
     def __check_url(self, url: str, file_name: str):
         """
         checks if the url is correct for that episode
@@ -159,8 +143,6 @@ class downloader:
         :return: str: url of the best match result
         """
 
-        # Todo : Remove sonyliv and google hardcode.
-        #        replace 'google' with 'self._preferred_engine' and 'www.sonyliv.com' with 'self._preferred_website'
         for result in results['results']:
             if result['engines'][0] == 'google' and result['parsed_url'][1] == 'www.sonyliv.com':
                 url = result['url']
@@ -176,36 +158,12 @@ class downloader:
 
         return ''
 
-    def __download(self, url: str):
-        """
-        Start Download using YTDL class and save it save_dir
-        :param url: url to be downloaded
-        :return:
-        """
-        my_ytdl = ytdl_downloader.YTDL_Downloader()
-        my_ytdl.set_save_dir(self.get_save_dir())
-        my_ytdl.set_download_url(download_url=url)
-        status_code: int = my_ytdl.start()
-        return status_code
-
-    def __update_tuple(self, tuple_name: tuple, pos: int):
-        """
-        Update the tuple's flag at position 'pos' to True (when download has completed)
-        :param tuple_name: tuple: tuple to be changed
-        :param pos: int: position at which change occurs
-        :return:
-        """
-        y = list(tuple_name)
-        y[pos] = True
-        tuple_name = tuple(y)
-        return tuple_name
-
     def __create_file_tuple_list(self, files_list: list):
         """
         For each file:- separate parent folder, file name and extension,
         add a download field as bool will be true when the download of that file in complete.
         Return as a list of tuples
-        :return: list = (path of file, file name, extension, bool)
+        :return: list = (path to file, file name, extension, bool)
         """
 
         final_list = []
@@ -233,38 +191,69 @@ class downloader:
 
         return final_list
 
-    def download(self, files_list: list, search_prefix: str = '', search_suffix: str = ''):
+    def __get_files_list(self):
+        my_crawler = file_crawler.File_Crawler(
+            file_dir=self._files_dir,
+            exclude_dirs=self._exclude_dirs,
+            recursive_crawl_flag=True
+        )
         """
-        :param files_list: list: list of file name (str) (may contain absolute file path)
+        files_list: list: list of file name (str) (may contain absolute file path)
+        """
+        files: list = my_crawler.get_files()
+
+        ## ---- for Debug ---- ##
+        # for x in self._files:
+        #     print(x)
+        # input()
+        ## ------------------- ##
+
+        # To separate parent folder, file name and extension. Also add a download field. Return as tuple
+        file_tuple_list = self.__create_file_tuple_list(files)
+
+        return file_tuple_list
+
+    # ------------------------- #
+
+    def _get_url_and_download(self, filename):
+        # Create search query for each file
+        search_query: str = self.__create_search_query(filename=filename,
+                                                       prefix=self._search_prefix,
+                                                       suffix=self._search_suffix)
+
+        # Get results for that search query from searX
+        results: dict = searx.SearX().get_results_json(search_query=search_query)
+
+        # from all results, find best result and Extract it's url
+        url = self.__get_best_result(results, file_name=filename)
+
+        # Create download object And download!
+        my_p_d = _Parallel_Downloader(self._save_dir)
+        my_p_d.download(url)
+
+    def start(self, search_prefix, search_suffix):
+        """
+        Get files list from filecrawler, create search query for each file and download.
+
         :param search_prefix: str: prefix req for search query
         :param search_suffix: str: suffix req for search query
         :return: None
         """
 
-        # To separate parent folder, file name and extension. Also add a download field. Return as tuple
-        file_tuple_list = self.__create_file_tuple_list(files_list)
+        self._search_prefix = search_prefix
+        self._search_suffix = search_suffix
 
-        for i in range(len(file_tuple_list)):
-            file_tuple = file_tuple_list[i]
+        """
+        file_tuple_list = list of (path to file, file name, extension, bool)
+        """
+        file_tuple_list = self.__get_files_list()
 
-            # Get search query for each file
-            filename = file_tuple[1]
-            search_query: str = self.__create_search_query(filename=filename,
-                                                           prefix=search_prefix,
-                                                           suffix=search_suffix)
+        file_name_list = [x[1] for x in file_tuple_list]
 
-            # Get results for that search query from searX
-            results: dict = searx.SearX().get_results_json(search_query=search_query)
+        # Todo : parallel here
+        # creating processes pool
+        with ProcessPoolExecutor(max_workers=4) as executor:
+            executor.map(self._get_url_and_download, file_name_list)
 
-            # from all results, find best result and Extract it's url
-            url = self.__get_best_result(results, file_name=file_tuple[1])
-
-            # if the file is not downloaded or if we could not find best result
-            # Todo: maybe update the 'url' condition
-            if not file_tuple[3] and url != '':
-                # Setup Youtube Downloader and start downloading
-                status_code: int = self.__download(url)
-
-                # Update tuple[3] to True, means file has successfully been downloaded
-                if status_code == 1:
-                    file_tuple_list[i] = self.__update_tuple(file_tuple, pos=3)
+        # processes finished
+        print("Done!")
