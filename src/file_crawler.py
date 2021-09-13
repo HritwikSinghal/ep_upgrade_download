@@ -8,7 +8,8 @@ class File_Crawler:
     Will take
         "file_dir": directory that we want to crawl
         "recursive_flag": If true, will recursively crawl 'file_dir'
-        "exclude_dirs": directories which we want to skip
+        "exclude_dirs": directories which we want to skip. Is a dict
+    returns "file_list": List of absolute path of files in crawl folder (and sub-dirs). each entry is str
     """
 
     def __init__(self, file_dir: str = '', exclude_dirs: dict = None, recursive_crawl_flag: bool = False):
@@ -82,6 +83,8 @@ class File_Crawler:
         ]
 
         file_list = []
+
+        # Todo : remove hard code
         for file in all_file_list:
             x = re.findall(
                 r'(.+\.[mM][pP]4)|'
@@ -101,16 +104,12 @@ class File_Crawler:
             if len(x) != 0:
                 for file_name in range(len(x[0])):
                     if os.path.isfile(os.path.join(folder_name, x[0][file_name])):
-                        file_list.append((folder_name, x[0][file_name]))
+                        file_list.append(os.path.join(folder_name, x[0][file_name]))
 
         # return sorted
-        return sorted(file_list, key=lambda temp: temp[1])
+        return sorted(file_list)
 
     def get_files(self):
-        """
-        :return file_list : list : List of files in that folder,
-                stores a tuple = (absolute path of file's folder : str, name of file : str)
-        """
 
         file_list = []
         if not self.recursive_flag:
